@@ -34,6 +34,12 @@ async def download_cover(
 
         # Resize with Pillow
         img = Image.open(BytesIO(image_data))
+
+        # Reject tiny placeholder images (e.g. OpenLibrary returns 1x1 when no cover exists)
+        if img.width < 10 or img.height < 10:
+            logger.info(f"Skipping placeholder image ({img.width}x{img.height}): {cover_url}")
+            return None
+
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
 

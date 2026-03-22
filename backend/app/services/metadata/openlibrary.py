@@ -45,8 +45,12 @@ class OpenLibraryProvider(MetadataProvider):
                 isbn_13_list = book.get("isbn_13", [])
                 isbn_10_list = book.get("isbn_10", [])
 
-                # Build cover URL
-                cover_url = f"{self.COVERS_URL}/b/isbn/{barcode}-L.jpg"
+                # Build cover URL — prefer cover ID over ISBN lookup
+                covers = book.get("covers", [])
+                if covers:
+                    cover_url = f"{self.COVERS_URL}/b/id/{covers[0]}-L.jpg"
+                else:
+                    cover_url = f"{self.COVERS_URL}/b/isbn/{barcode}-L.jpg"
 
                 # Publishers
                 publishers = book.get("publishers", [])

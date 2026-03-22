@@ -48,8 +48,11 @@ async def refresh_item_metadata(
 
     # Try barcode lookup first, then title search
     results = []
+    from_barcode = False
     if item.barcode:
         results = await resolver.lookup_barcode(item.barcode)
+        if results:
+            from_barcode = True
     if not results and item.title:
         results = await resolver.search(item.title, item.media_type)
 
@@ -109,8 +112,9 @@ async def refresh_item_metadata(
                 book_meta.isbn_10 = meta.extra["isbn_10"]
                 updated = True
 
-    # Download cover if missing
-    if not item.cover_path and meta.cover_url:
+    # Download cover if missing — only trust covers from barcode matches
+    # Title search can return wrong books, so skip cover download for those
+    if not item.cover_path and meta.cover_url and from_barcode:
         cover_path = await download_cover(meta.cover_url, item.media_type, str(item.id))
         if cover_path:
             item.cover_path = cover_path
@@ -125,6 +129,8 @@ async def refresh_item_metadata(
         msg.append("metadata updated")
     if cover_updated:
         msg.append("cover downloaded")
+    if not from_barcode and not item.cover_path:
+        msg.append("cover skipped (title match only, may be inaccurate)")
     if not msg:
         msg.append("no new data found")
 
@@ -153,8 +159,11 @@ async def refresh_all_metadata(
     for item in items:
         try:
             results = []
+            from_barcode = False
             if item.barcode:
                 results = await resolver.lookup_barcode(item.barcode)
+                if results:
+                    from_barcode = True
             if not results and item.title:
                 results = await resolver.search(item.title, item.media_type)
 
@@ -185,8 +194,8 @@ async def refresh_all_metadata(
             elif meta.source == "google_books" and not item.google_books_id:
                 item.google_books_id = meta.source_id
 
-            # Download cover
-            if not item.cover_path and meta.cover_url:
+            # Download cover — only from barcode matches to avoid wrong covers
+            if not item.cover_path and meta.cover_url and from_barcode:
                 cover_path = await download_cover(meta.cover_url, item.media_type, str(item.id))
                 if cover_path:
                     item.cover_path = cover_path
