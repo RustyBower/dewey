@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.database import get_db
@@ -13,6 +14,7 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 
 class StatsResponse(BaseModel):
+    total: int
     by_media_type: dict[str, int]
     by_status: dict[str, int]
     recent: list[ItemResponse]
@@ -35,13 +37,24 @@ async def get_stats(
     )
     by_status = {row[0]: row[1] for row in status_result.all()}
 
-    # Recent additions
+    # Recent additions (with eager-loaded metadata to avoid greenlet errors)
     recent_result = await db.execute(
-        select(Item).order_by(Item.created_at.desc()).limit(10)
+        select(Item)
+        .options(
+            selectinload(Item.book_metadata),
+            selectinload(Item.movie_metadata),
+            selectinload(Item.music_metadata),
+            selectinload(Item.game_metadata),
+        )
+        .order_by(Item.created_at.desc())
+        .limit(10)
     )
     recent = list(recent_result.scalars().all())
 
+    total = sum(by_media_type.values())
+
     return StatsResponse(
+        total=total,
         by_media_type=by_media_type,
         by_status=by_status,
         recent=recent,

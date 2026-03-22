@@ -6,33 +6,34 @@ export interface GetItemsParams {
   per_page?: number;
   media_type?: MediaType;
   status?: ItemStatus;
-  search?: string;
-  collection_id?: number;
-  sort_by?: string;
-  sort_order?: 'asc' | 'desc';
+  q?: string;
+  collection_id?: string;
+  tag?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
 }
 
 export async function getItems(params?: GetItemsParams): Promise<ItemListResponse> {
-  const { data } = await client.get<ItemListResponse>('/items', { params });
+  const { data } = await client.get<ItemListResponse>('/items/', { params });
   return data;
 }
 
-export async function getItem(id: number): Promise<Item> {
+export async function getItem(id: string): Promise<Item> {
   const { data } = await client.get<Item>(`/items/${id}`);
   return data;
 }
 
-export async function createItem(item: Partial<Item>): Promise<Item> {
-  const { data } = await client.post<Item>('/items', item);
+export async function createItem(item: Partial<Item> & { cover_url?: string }): Promise<Item> {
+  const { data } = await client.post<Item>('/items/', item);
   return data;
 }
 
-export async function updateItem(id: number, item: Partial<Item>): Promise<Item> {
-  const { data } = await client.put<Item>(`/items/${id}`, item);
+export async function updateItem(id: string, item: Partial<Item>): Promise<Item> {
+  const { data } = await client.patch<Item>(`/items/${id}`, item);
   return data;
 }
 
-export async function deleteItem(id: number): Promise<void> {
+export async function deleteItem(id: string): Promise<void> {
   await client.delete(`/items/${id}`);
 }
 
@@ -59,13 +60,13 @@ export async function getStats() {
   return data;
 }
 
-export async function getLendingHistory(itemId: number): Promise<LendingRecord[]> {
-  const { data } = await client.get<LendingRecord[]>(`/items/${itemId}/lendings`);
+export async function getLendingHistory(itemId: string): Promise<LendingRecord[]> {
+  const { data } = await client.get<LendingRecord[]>(`/items/${itemId}/lending`);
   return data;
 }
 
 export async function lendItem(
-  itemId: number,
+  itemId: string,
   payload: {
     borrower_name: string;
     borrower_contact?: string;
@@ -73,13 +74,24 @@ export async function lendItem(
     notes?: string;
   }
 ): Promise<LendingRecord> {
-  const { data } = await client.post<LendingRecord>(`/items/${itemId}/lendings`, payload);
+  const { data } = await client.post<LendingRecord>(`/items/${itemId}/lending`, payload);
   return data;
 }
 
-export async function returnItem(itemId: number, lendingId: number): Promise<LendingRecord> {
-  const { data } = await client.post<LendingRecord>(
-    `/items/${itemId}/lendings/${lendingId}/return`
+export async function returnItem(itemId: string, lendingId: string): Promise<LendingRecord> {
+  const { data } = await client.patch<LendingRecord>(
+    `/items/${itemId}/lending/${lendingId}`,
+    { returned_at: new Date().toISOString() }
   );
+  return data;
+}
+
+export async function refreshItemMetadata(itemId: string) {
+  const { data } = await client.post(`/refresh/item/${itemId}`);
+  return data;
+}
+
+export async function refreshAllMetadata() {
+  const { data } = await client.post('/refresh/all');
   return data;
 }

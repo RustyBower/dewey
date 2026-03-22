@@ -70,9 +70,9 @@ function RecentItemCard({ item }: { item: Item }) {
       to={`/items/${item.id}`}
       className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 hover:border-rose-300 dark:hover:border-rose-800 transition-colors group"
     >
-      {item.cover_url ? (
+      {item.cover_path ? (
         <img
-          src={item.cover_url}
+          src={`/covers/${item.cover_path}`}
           alt={item.title}
           className="w-full h-32 object-cover rounded mb-2"
         />
@@ -84,9 +84,9 @@ function RecentItemCard({ item }: { item: Item }) {
       <h3 className="text-sm font-medium truncate group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
         {item.title}
       </h3>
-      {item.creators.length > 0 && (
+      {item.creators && (
         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-          {item.creators.join(', ')}
+          {item.creators}
         </p>
       )}
       <p className="text-[10px] text-gray-400 mt-1">
@@ -107,7 +107,7 @@ export default function Home() {
 
   const { data: recentData, isLoading: recentLoading } = useQuery({
     queryKey: ['items', 'recent'],
-    queryFn: () => getItems({ sort_by: 'created_at', sort_order: 'desc', per_page: 10 }),
+    queryFn: () => getItems({ sort: 'created_at', order: 'desc', per_page: 10 }),
   });
 
   const recentItems = recentData?.items ?? [];

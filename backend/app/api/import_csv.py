@@ -10,9 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.database import get_db
-from app.models.collection import Collection
+from app.models.collection import Collection, item_collections
 from app.models.item import BookMetadata, GameMetadata, Item, MovieMetadata, MusicMetadata
-from app.models.tag import Tag
+from app.models.tag import Tag, item_tags
 from app.models.user import User
 
 router = APIRouter(prefix="/import", tags=["import"])
@@ -308,6 +308,7 @@ async def confirm_libib_import(
                 item.game_metadata = game_meta
 
             db.add(item)
+            await db.flush()  # Get item.id for association inserts
 
             # Handle collections (from both 'collection' and 'group' fields)
             collection_names = set()
@@ -336,7 +337,12 @@ async def confirm_libib_import(
                         await db.flush()
                         collection_cache[coll_name] = new_coll
 
-                item.collections.append(collection_cache[coll_name])
+                await db.execute(
+                    item_collections.insert().values(
+                        item_id=item.id,
+                        collection_id=collection_cache[coll_name].id,
+                    )
+                )
 
             # Handle tags
             if mapped["tags"]:
@@ -355,7 +361,12 @@ async def confirm_libib_import(
                             await db.flush()
                             tag_cache[tag_name] = new_tag
 
-                    item.tags.append(tag_cache[tag_name])
+                    await db.execute(
+                        item_tags.insert().values(
+                            item_id=item.id,
+                            tag_id=tag_cache[tag_name].id,
+                        )
+                    )
 
             imported += 1
 

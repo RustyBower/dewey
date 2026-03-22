@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Search,
   BookOpen,
@@ -11,8 +11,10 @@ import {
   List,
   Plus,
   Star,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
-import { getItems } from '../api/items';
+import { getItems, refreshAllMetadata } from '../api/items';
 import type { MediaType, Item } from '../types';
 
 const tabs: { label: string; value: MediaType | 'all' }[] = [
@@ -69,9 +71,9 @@ function ItemCardGrid({ item }: { item: Item }) {
       to={`/items/${item.id}`}
       className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden hover:border-rose-300 dark:hover:border-rose-800 transition-colors group"
     >
-      {item.cover_url ? (
+      {item.cover_path ? (
         <img
-          src={item.cover_url}
+          src={`/covers/${item.cover_path}`}
           alt={item.title}
           className="w-full h-44 object-cover"
         />
@@ -84,9 +86,9 @@ function ItemCardGrid({ item }: { item: Item }) {
         <h3 className="text-sm font-medium truncate group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
           {item.title}
         </h3>
-        {item.creators.length > 0 && (
+        {item.creators && (
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-            {item.creators.join(', ')}
+            {item.creators}
           </p>
         )}
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -132,9 +134,9 @@ function ItemCardList({ item }: { item: Item }) {
       to={`/items/${item.id}`}
       className="flex gap-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 hover:border-rose-300 dark:hover:border-rose-800 transition-colors group"
     >
-      {item.cover_url ? (
+      {item.cover_path ? (
         <img
-          src={item.cover_url}
+          src={`/covers/${item.cover_path}`}
           alt={item.title}
           className="w-14 h-20 object-cover rounded flex-shrink-0"
         />
@@ -147,9 +149,9 @@ function ItemCardList({ item }: { item: Item }) {
         <h3 className="text-sm font-medium truncate group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
           {item.title}
         </h3>
-        {item.creators.length > 0 && (
+        {item.creators && (
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-            {item.creators.join(', ')}
+            {item.creators}
           </p>
         )}
         <div className="flex items-center gap-2 flex-wrap">
@@ -230,11 +232,11 @@ export default function Library() {
     queryFn: () =>
       getItems({
         media_type: activeTab === 'all' ? undefined : activeTab,
-        search: debouncedSearch || undefined,
+        q: debouncedSearch || undefined,
         page,
         per_page: perPage,
-        sort_by: sortBy,
-        sort_order: sortOrder,
+        sort: sortBy,
+        order: sortOrder,
       }),
   });
 
@@ -242,18 +244,43 @@ export default function Library() {
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / perPage));
 
+  const queryClient = useQueryClient();
+  const refreshMutation = useMutation({
+    mutationFn: refreshAllMetadata,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Library</h1>
-        <Link
-          to="/search"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 text-sm font-medium transition-colors"
-        >
-          <Plus size={16} />
-          Add Item
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => refreshMutation.mutate()}
+            disabled={refreshMutation.isPending}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+            title="Fetch missing covers and metadata from external sources"
+          >
+            {refreshMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {refreshMutation.isPending ? 'Refreshing...' : 'Refresh Metadata'}
+          </button>
+          <Link
+            to="/search"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            Add Item
+          </Link>
+        </div>
       </div>
+      {refreshMutation.isSuccess && (
+        <div className="rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-3 py-2 text-sm text-green-700 dark:text-green-300">
+          Refreshed: {(refreshMutation.data as any)?.updated ?? 0} updated, {(refreshMutation.data as any)?.skipped ?? 0} skipped
+        </div>
+      )}
 
       {/* Filters bar */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4">

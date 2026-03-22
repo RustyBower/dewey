@@ -10,6 +10,7 @@ import Scan from './pages/Scan';
 import Search from './pages/Search';
 import Import from './pages/Import';
 import ItemDetail from './pages/ItemDetail';
+import Settings from './pages/Settings';
 import type { ReactNode } from 'react';
 
 const queryClient = new QueryClient({
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="/search" element={<Search />} />
               <Route path="/import" element={<Import />} />
               <Route path="/items/:id" element={<ItemDetail />} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
           </Routes>
         </AuthProvider>

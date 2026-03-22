@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   X,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -62,6 +63,13 @@ export default function Shell() {
                 <User size={14} className="inline mr-1" />
                 {user?.display_name || user?.username}
               </span>
+              <Link
+                to="/settings"
+                className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors"
+              >
+                <Settings size={14} />
+                Settings
+              </Link>
               <button
                 onClick={logout}
                 className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 transition-colors"
@@ -105,6 +113,14 @@ export default function Shell() {
                 <User size={14} className="inline mr-1" />
                 {user?.display_name || user?.username}
               </div>
+              <Link
+                to="/settings"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-500 dark:text-gray-400"
+              >
+                <Settings size={14} />
+                Settings
+              </Link>
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);

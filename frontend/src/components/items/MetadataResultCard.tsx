@@ -91,9 +91,9 @@ export default function MetadataResultCard({
           {result.title}
         </h3>
 
-        {result.creators.length > 0 && (
+        {result.creators && (
           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-            {result.creators.join(', ')}
+            {result.creators}
           </p>
         )}
 
@@ -108,9 +108,9 @@ export default function MetadataResultCard({
           </span>
         </div>
 
-        {result.genre.length > 0 && (
+        {result.genre && (
           <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate">
-            {result.genre.slice(0, 3).join(', ')}
+            {result.genre}
           </p>
         )}
 

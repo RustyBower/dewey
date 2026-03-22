@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,13 @@ from app.schemas.user import TokenResponse, UserCreate, UserLogin, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
 class RefreshRequest(BaseModel):
@@ -57,7 +63,7 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)) -> Toke
     user = User(
         username=data.username,
         email=data.email,
-        password_hash=pwd_context.hash(data.password),
+        password_hash=hash_password(data.password),
         is_admin=is_first_user,
     )
     db.add(user)
@@ -74,7 +80,7 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)) -> Toke
 async def login(data: UserLogin, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     result = await db.execute(select(User).where(User.username == data.username))
     user = result.scalar_one_or_none()
-    if not user or not pwd_context.verify(data.password, user.password_hash):
+    if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",

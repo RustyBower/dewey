@@ -77,6 +77,8 @@ class ItemCreate(BaseModel):
     notes: str | None = None
     review: str | None = None
 
+    cover_url: str | None = None  # External URL — will be downloaded on create
+
     book_metadata: BookMetadataSchema | None = None
     movie_metadata: MovieMetadataSchema | None = None
     music_metadata: MusicMetadataSchema | None = None

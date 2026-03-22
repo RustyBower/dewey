@@ -5,7 +5,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { searchMetadata } from '../api/lookup';
 import { createItem } from '../api/items';
 import MetadataResultCard from '../components/items/MetadataResultCard';
-import type { MediaType, MetadataResult, ItemStatus } from '../types';
+import type { MediaType, MetadataResult, ItemStatus, Item } from '../types';
 
 const mediaTypes: { label: string; value: MediaType | '' }[] = [
   { label: 'All Types', value: '' },
@@ -45,16 +45,16 @@ export default function Search() {
     }) => {
       return createItem({
         title: result.title,
-        media_type: result.media_type,
+        media_type: result.media_type as Item['media_type'],
         creators: result.creators,
         year: result.year,
         description: result.description,
-        cover_url: result.cover_url,
         genre: result.genre,
         barcode: result.barcode,
+        publisher: result.publisher,
         status,
         notes: location ? `Location: ${location}` : null,
-        metadata: result.extra as Record<string, unknown>,
+        cover_url: result.cover_url ?? undefined,
       });
     },
     onSuccess: () => {

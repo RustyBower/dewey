@@ -18,11 +18,13 @@ import {
   Loader2,
   HandHelping,
   RotateCcw,
+  RefreshCw,
 } from 'lucide-react';
 import {
   getItem,
   updateItem,
   deleteItem,
+  refreshItemMetadata,
   getLendingHistory,
   lendItem,
   returnItem,
@@ -122,16 +124,17 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 function BookDetails({ meta }: { meta: BookMetadata }) {
   return (
     <>
-      <DetailRow label="ISBN" value={meta.isbn} />
-      <DetailRow label="ISBN-13" value={meta.isbn13} />
-      <DetailRow label="Pages" value={meta.pages} />
-      <DetailRow label="Publisher" value={meta.publisher} />
+      <DetailRow label="ISBN-10" value={meta.isbn_10} />
+      <DetailRow label="ISBN-13" value={meta.isbn_13} />
+      <DetailRow label="Pages" value={meta.page_count} />
       <DetailRow label="Language" value={meta.language} />
+      <DetailRow label="Edition" value={meta.edition} />
+      <DetailRow label="Format" value={meta.format} />
       <DetailRow
         label="Series"
         value={
-          meta.series
-            ? `${meta.series}${meta.series_number ? ` #${meta.series_number}` : ''}`
+          meta.series_name
+            ? `${meta.series_name}${meta.series_position ? ` #${meta.series_position}` : ''}`
             : undefined
         }
       />
@@ -175,9 +178,9 @@ function MovieDetails({ meta }: { meta: MovieMetadata }) {
         label="Runtime"
         value={meta.runtime_minutes ? `${meta.runtime_minutes} min` : undefined}
       />
-      <DetailRow label="Studio" value={meta.studio} />
       <DetailRow label="Format" value={meta.format} />
       <DetailRow label="Region" value={meta.region} />
+      <DetailRow label="Content Rating" value={meta.content_rating} />
     </>
   );
 }
@@ -186,20 +189,8 @@ function MusicDetails({ meta }: { meta: MusicMetadata }) {
   return (
     <>
       <DetailRow
-        label="Discogs ID"
-        value={
-          meta.discogs_id ? (
-            <a
-              href={`https://www.discogs.com/release/${meta.discogs_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-rose-600 hover:text-rose-700 dark:text-rose-400"
-            >
-              {meta.discogs_id}
-              <ExternalLink size={12} />
-            </a>
-          ) : undefined
-        }
+        label="MusicBrainz ID"
+        value={meta.musicbrainz_release_id}
       />
       <DetailRow label="Label" value={meta.label} />
       <DetailRow label="Format" value={meta.format} />
@@ -217,25 +208,22 @@ function GameDetails({ meta }: { meta: GameMetadata }) {
         value={meta.igdb_id}
       />
       <DetailRow label="Platform" value={meta.platform} />
-      <DetailRow label="Publisher" value={meta.publisher} />
-      <DetailRow label="Developer" value={meta.developer} />
       <DetailRow label="Format" value={meta.format} />
+      <DetailRow label="ESRB Rating" value={meta.esrb_rating} />
     </>
   );
 }
 
 function MediaSpecificDetails({ item }: { item: Item }) {
-  if (!item.metadata) return null;
-
   switch (item.media_type) {
     case 'book':
-      return <BookDetails meta={item.metadata as BookMetadata} />;
+      return item.book_metadata ? <BookDetails meta={item.book_metadata} /> : null;
     case 'movie':
-      return <MovieDetails meta={item.metadata as MovieMetadata} />;
+      return item.movie_metadata ? <MovieDetails meta={item.movie_metadata} /> : null;
     case 'music':
-      return <MusicDetails meta={item.metadata as MusicMetadata} />;
+      return item.music_metadata ? <MusicDetails meta={item.music_metadata} /> : null;
     case 'game':
-      return <GameDetails meta={item.metadata as GameMetadata} />;
+      return item.game_metadata ? <GameDetails meta={item.game_metadata} /> : null;
     default:
       return null;
   }
@@ -380,7 +368,7 @@ function LendForm({
   );
 }
 
-function LendingSection({ itemId }: { itemId: number }) {
+function LendingSection({ itemId }: { itemId: string }) {
   const queryClient = useQueryClient();
   const [showLendForm, setShowLendForm] = useState(false);
 
@@ -403,7 +391,7 @@ function LendingSection({ itemId }: { itemId: number }) {
   });
 
   const returnMutation = useMutation({
-    mutationFn: (lendingId: number) => returnItem(itemId, lendingId),
+    mutationFn: (lendingId: string) => returnItem(itemId, lendingId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lendings', itemId] });
     },
@@ -566,7 +554,6 @@ export default function ItemDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const numericId = Number(id);
 
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Item>>({});
@@ -578,25 +565,32 @@ export default function ItemDetail() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ['item', numericId],
-    queryFn: () => getItem(numericId),
-    enabled: !isNaN(numericId),
+    queryKey: ['item', id],
+    queryFn: () => getItem(id!),
+    enabled: !!id,
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<Item>) => updateItem(numericId, data),
+    mutationFn: (data: Partial<Item>) => updateItem(id!, data),
     onSuccess: (updated) => {
-      queryClient.setQueryData(['item', numericId], updated);
+      queryClient.setQueryData(['item', id], updated);
       queryClient.invalidateQueries({ queryKey: ['items'] });
       setEditing(false);
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteItem(numericId),
+    mutationFn: () => deleteItem(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items'] });
       navigate('/library', { replace: true });
+    },
+  });
+
+  const refreshMutation = useMutation({
+    mutationFn: () => refreshItemMetadata(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['item', id] });
     },
   });
 
@@ -604,16 +598,16 @@ export default function ItemDetail() {
     if (!item) return;
     setEditData({
       title: item.title,
-      creators: [...item.creators],
+      creators: item.creators,
       year: item.year,
-      genre: [...item.genre],
+      genre: item.genre,
       description: item.description,
       status: item.status,
       consumption_status: item.consumption_status,
       rating: item.rating,
       notes: item.notes,
       barcode: item.barcode,
-      cover_url: item.cover_url,
+      cover_path: item.cover_path,
     });
     setEditing(true);
   }
@@ -692,9 +686,9 @@ export default function ItemDetail() {
       <div className="flex flex-col md:flex-row gap-6">
         {/* Left: Cover */}
         <div className="flex-shrink-0">
-          {item.cover_url ? (
+          {item.cover_path ? (
             <img
-              src={item.cover_url}
+              src={`/covers/${item.cover_path}`}
               alt={item.title}
               className="w-48 h-72 object-cover rounded-lg shadow-md"
             />
@@ -718,14 +712,11 @@ export default function ItemDetail() {
               />
               <input
                 type="text"
-                value={(editData.creators ?? []).join(', ')}
+                value={editData.creators ?? ''}
                 onChange={(e) =>
                   setEditData({
                     ...editData,
-                    creators: e.target.value
-                      .split(',')
-                      .map((s) => s.trim())
-                      .filter(Boolean),
+                    creators: e.target.value,
                   })
                 }
                 placeholder="Creators (comma-separated)"
@@ -735,9 +726,9 @@ export default function ItemDetail() {
           ) : (
             <div>
               <h1 className="text-2xl font-semibold">{item.title}</h1>
-              {item.creators.length > 0 && (
+              {item.creators && (
                 <p className="text-gray-500 dark:text-gray-400 mt-0.5">
-                  {item.creators.join(', ')}
+                  {item.creators}
                 </p>
               )}
             </div>
@@ -747,10 +738,10 @@ export default function ItemDetail() {
           {!editing && (
             <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 flex-wrap">
               {item.year && <span>{item.year}</span>}
-              {item.genre.length > 0 && (
+              {item.genre && (
                 <>
                   {item.year && <span className="text-gray-300 dark:text-gray-600">|</span>}
-                  <span>{item.genre.join(', ')}</span>
+                  <span>{item.genre}</span>
                 </>
               )}
             </div>
@@ -853,6 +844,15 @@ export default function ItemDetail() {
             ) : (
               <>
                 <button
+                  onClick={() => refreshMutation.mutate()}
+                  disabled={refreshMutation.isPending}
+                  className="inline-flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-700 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+                  title="Fetch metadata and cover art from external sources"
+                >
+                  {refreshMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  {refreshMutation.isPending ? 'Refreshing...' : 'Refresh'}
+                </button>
+                <button
                   onClick={startEdit}
                   className="inline-flex items-center gap-1 rounded-md border border-gray-300 dark:border-gray-700 px-3 py-1.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
@@ -938,24 +938,6 @@ export default function ItemDetail() {
             </h2>
             <MediaSpecificDetails item={item} />
             <DetailRow label="Barcode" value={item.barcode} />
-            {item.tags.length > 0 && (
-              <DetailRow
-                label="Tags"
-                value={
-                  <div className="flex gap-1 flex-wrap">
-                    {item.tags.map((t) => (
-                      <span
-                        key={t.id}
-                        className="inline-block rounded-full px-2 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                        style={t.color ? { backgroundColor: t.color + '20', color: t.color } : undefined}
-                      >
-                        {t.name}
-                      </span>
-                    ))}
-                  </div>
-                }
-              />
-            )}
             <DetailRow
               label="Added"
               value={new Date(item.created_at).toLocaleDateString()}
@@ -969,7 +951,7 @@ export default function ItemDetail() {
       </div>
 
       {/* Lending section */}
-      <LendingSection itemId={numericId} />
+      <LendingSection itemId={id!} />
     </div>
   );
 }

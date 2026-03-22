@@ -102,7 +102,7 @@ async def create_item(
     current_user: User = Depends(get_current_user),
 ) -> Item:
     item_data = data.model_dump(
-        exclude={"book_metadata", "movie_metadata", "music_metadata", "game_metadata"}
+        exclude={"book_metadata", "movie_metadata", "music_metadata", "game_metadata", "cover_url"}
     )
     item = Item(**item_data, added_by=current_user.id)
     db.add(item)
@@ -114,6 +114,14 @@ async def create_item(
         model_cls = METADATA_MODEL_MAP[data.media_type]
         meta = model_cls(item_id=item.id, **metadata_schema.model_dump())
         db.add(meta)
+
+    # Download cover art if a URL was provided
+    if data.cover_url and not item.cover_path:
+        from app.services.cover_art import download_cover
+
+        cover_path = await download_cover(data.cover_url, data.media_type, str(item.id))
+        if cover_path:
+            item.cover_path = cover_path
 
     await db.flush()
     await db.refresh(item, attribute_names=list(METADATA_ATTR_MAP.values()))
