@@ -38,9 +38,8 @@ RUN pip install --no-cache-dir .
 COPY backend/ ./
 COPY --from=frontend-build /build/dist ./static/
 
-RUN mkdir -p /data/covers
-
 RUN useradd -r -u 1000 dewey
+RUN mkdir -p /data/covers && chown dewey:dewey /data/covers
 USER dewey
 
 EXPOSE 8000
