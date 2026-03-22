@@ -9,13 +9,14 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     TMDB_API_KEY: str | None = None
+    TMDB_READ_ACCESS_TOKEN: str | None = None
     GOOGLE_BOOKS_API_KEY: str | None = None
     IGDB_CLIENT_ID: str | None = None
     IGDB_CLIENT_SECRET: str | None = None
 
     COVERS_DIR: str = "/data/covers"
 
-    model_config = {"env_prefix": "", "env_file": ".env", "extra": "ignore"}
+    model_config = {"env_prefix": "", "env_file": ("../.env", ".env"), "extra": "ignore"}
 
 
 settings = Settings()

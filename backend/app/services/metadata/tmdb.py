@@ -36,20 +36,29 @@ class TMDBProvider(MetadataProvider):
     BASE_URL = "https://api.themoviedb.org/3"
     IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
 
+    def _get_client_kwargs(self) -> tuple[dict, dict]:
+        """Return (headers, params) for TMDB auth. Prefers Bearer token over API key."""
+        if settings.TMDB_READ_ACCESS_TOKEN:
+            return {"Authorization": f"Bearer {settings.TMDB_READ_ACCESS_TOKEN}"}, {}
+        if settings.TMDB_API_KEY:
+            return {}, {"api_key": settings.TMDB_API_KEY}
+        return {}, {}
+
     async def lookup_barcode(self, barcode: str) -> list[MetadataResult]:
         # TMDB does not support barcode lookup for movies
         return []
 
     async def search(self, query: str) -> list[MetadataResult]:
-        if not settings.TMDB_API_KEY:
-            logger.warning("TMDB_API_KEY not configured, skipping TMDB search")
+        if not settings.TMDB_API_KEY and not settings.TMDB_READ_ACCESS_TOKEN:
+            logger.warning("TMDB not configured, skipping TMDB search")
             return []
 
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
+            headers, auth_params = self._get_client_kwargs()
+            async with httpx.AsyncClient(timeout=15, headers=headers) as client:
                 resp = await client.get(
                     f"{self.BASE_URL}/search/movie",
-                    params={"query": query, "api_key": settings.TMDB_API_KEY},
+                    params={"query": query, **auth_params},
                 )
                 if resp.status_code != 200:
                     return []
@@ -100,15 +109,16 @@ class TMDBProvider(MetadataProvider):
 
     async def get_movie_details(self, tmdb_id: int) -> MetadataResult | None:
         """Fetch full movie details by TMDB ID for extra metadata."""
-        if not settings.TMDB_API_KEY:
-            logger.warning("TMDB_API_KEY not configured")
+        if not settings.TMDB_API_KEY and not settings.TMDB_READ_ACCESS_TOKEN:
+            logger.warning("TMDB not configured")
             return None
 
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
+            headers, auth_params = self._get_client_kwargs()
+            async with httpx.AsyncClient(timeout=15, headers=headers) as client:
                 resp = await client.get(
                     f"{self.BASE_URL}/movie/{tmdb_id}",
-                    params={"api_key": settings.TMDB_API_KEY},
+                    params=auth_params,
                 )
                 if resp.status_code != 200:
                     return None
