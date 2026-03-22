@@ -14,7 +14,7 @@ import {
   RefreshCw,
   Loader2,
 } from 'lucide-react';
-import { getItems, refreshAllMetadata } from '../api/items';
+import { getItems, refreshAllMetadata, getRefreshStatus } from '../api/items';
 import type { MediaType, Item } from '../types';
 
 const tabs: { label: string; value: MediaType | 'all' }[] = [
@@ -245,13 +245,31 @@ export default function Library() {
   const totalPages = Math.max(1, Math.ceil(total / perPage));
 
   const queryClient = useQueryClient();
+  const [refreshStarted, setRefreshStarted] = useState(false);
+
   const refreshMutation = useMutation({
     mutationFn: refreshAllMetadata,
-    onSuccess: () => {
+    onSuccess: () => setRefreshStarted(true),
+  });
+
+  // Poll refresh status while running
+  const { data: refreshStatus } = useQuery({
+    queryKey: ['refresh-status'],
+    queryFn: getRefreshStatus,
+    refetchInterval: refreshStarted ? 2000 : false,
+    enabled: refreshStarted,
+  });
+
+  // Stop polling when done
+  useEffect(() => {
+    if (refreshStatus && !refreshStatus.running && refreshStarted) {
+      setRefreshStarted(false);
       queryClient.invalidateQueries({ queryKey: ['items'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
-    },
-  });
+    }
+  }, [refreshStatus, refreshStarted, queryClient]);
+
+  const isRefreshing = refreshMutation.isPending || (refreshStatus?.running ?? false);
 
   return (
     <div className="space-y-6">
@@ -260,12 +278,14 @@ export default function Library() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => refreshMutation.mutate()}
-            disabled={refreshMutation.isPending}
+            disabled={isRefreshing}
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
             title="Fetch missing covers and metadata from external sources"
           >
-            {refreshMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-            {refreshMutation.isPending ? 'Refreshing...' : 'Refresh Metadata'}
+            {isRefreshing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+            {isRefreshing && refreshStatus
+              ? `Refreshing ${refreshStatus.processed}/${refreshStatus.total}...`
+              : 'Refresh Metadata'}
           </button>
           <Link
             to="/search"
@@ -276,9 +296,10 @@ export default function Library() {
           </Link>
         </div>
       </div>
-      {refreshMutation.isSuccess && (
+      {refreshStatus && !refreshStatus.running && refreshStatus.finished_at && (
         <div className="rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-3 py-2 text-sm text-green-700 dark:text-green-300">
-          Refreshed: {(refreshMutation.data as any)?.updated ?? 0} updated, {(refreshMutation.data as any)?.skipped ?? 0} skipped
+          Refresh complete: {refreshStatus.updated} updated, {refreshStatus.skipped} skipped
+          {refreshStatus.errors.length > 0 && `, ${refreshStatus.errors.length} errors`}
         </div>
       )}
 

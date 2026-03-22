@@ -104,3 +104,8 @@ export async function refreshAllMetadata() {
   const { data } = await client.post('/refresh/all');
   return data;
 }
+
+export async function getRefreshStatus() {
+  const { data } = await client.get('/refresh/status');
+  return data;
+}
