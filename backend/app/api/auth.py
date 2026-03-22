@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -39,8 +39,8 @@ def create_refresh_token(user_id: str) -> str:
     )
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(data: UserCreate, db: AsyncSession = Depends(get_db)) -> User:
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(data: UserCreate, db: AsyncSession = Depends(get_db)) -> TokenResponse:
     result = await db.execute(
         select(User).where((User.username == data.username) | (User.email == data.email))
     )
@@ -50,15 +50,24 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)) -> User
             detail="Username or email already registered",
         )
 
+    # First user is automatically admin
+    user_count = await db.execute(select(func.count(User.id)))
+    is_first_user = (user_count.scalar() or 0) == 0
+
     user = User(
         username=data.username,
         email=data.email,
         password_hash=pwd_context.hash(data.password),
+        is_admin=is_first_user,
     )
     db.add(user)
     await db.flush()
     await db.refresh(user)
-    return user
+
+    return TokenResponse(
+        access_token=create_access_token(str(user.id)),
+        refresh_token=create_refresh_token(str(user.id)),
+    )
 
 
 @router.post("/login", response_model=TokenResponse)

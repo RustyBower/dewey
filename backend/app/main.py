@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import auth, collections, import_csv, items, lending, lookup, stats, tags
+from app.api import auth, collections, import_csv, items, lending, lookup, stats, tags, users
 from app.config import settings
 
 
@@ -42,6 +42,7 @@ app.include_router(lending.router, prefix=api_prefix)
 app.include_router(lookup.router, prefix=api_prefix)
 app.include_router(import_csv.router, prefix=api_prefix)
 app.include_router(stats.router, prefix=api_prefix)
+app.include_router(users.router, prefix=api_prefix)
 
 
 @app.get("/api/health")
