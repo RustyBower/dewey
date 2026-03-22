@@ -1,6 +1,9 @@
 import uuid
+from io import BytesIO
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from PIL import Image
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -192,3 +195,46 @@ async def delete_item(
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
     await db.delete(item)
+
+
+@router.post("/{item_id}/cover", response_model=ItemResponse)
+async def upload_cover(
+    item_id: uuid.UUID,
+    file: UploadFile,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+) -> Item:
+    """Upload a custom cover image for an item."""
+    result = await db.execute(
+        select(Item).where(Item.id == item_id).options(*ITEM_LOAD_OPTIONS)
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10MB limit
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="File too large (10MB max)")
+
+    try:
+        img = Image.open(BytesIO(content))
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        # Resize if wider than 600px
+        if img.width > 600:
+            ratio = 600 / img.width
+            img = img.resize((600, int(img.height * ratio)), Image.LANCZOS)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image file")
+
+    from app.config import settings
+
+    output_dir = Path(settings.COVERS_DIR) / item.media_type
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{item.id}.jpg"
+    img.save(str(output_path), "JPEG", quality=85)
+
+    item.cover_path = f"{item.media_type}/{item.id}.jpg"
+    await db.flush()
+    await db.refresh(item, attribute_names=list(METADATA_ATTR_MAP.values()))
+    return item

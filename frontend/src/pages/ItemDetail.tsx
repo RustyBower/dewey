@@ -19,12 +19,14 @@ import {
   HandHelping,
   RotateCcw,
   RefreshCw,
+  ImagePlus,
 } from 'lucide-react';
 import {
   getItem,
   updateItem,
   deleteItem,
   refreshItemMetadata,
+  uploadCover,
   getLendingHistory,
   lendItem,
   returnItem,
@@ -594,6 +596,24 @@ export default function ItemDetail() {
     },
   });
 
+  const coverMutation = useMutation({
+    mutationFn: (file: File) => uploadCover(id!, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['item', id] });
+    },
+  });
+
+  function handleCoverUpload() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) coverMutation.mutate(file);
+    };
+    input.click();
+  }
+
   function startEdit() {
     if (!item) return;
     setEditData({
@@ -685,7 +705,7 @@ export default function ItemDetail() {
 
       <div className="flex flex-col md:flex-row gap-6">
         {/* Left: Cover */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 group relative">
           {item.cover_path ? (
             <img
               src={`/covers/${item.cover_path}`}
@@ -697,6 +717,14 @@ export default function ItemDetail() {
               <Icon size={48} className="text-gray-400" />
             </div>
           )}
+          <button
+            onClick={handleCoverUpload}
+            disabled={coverMutation.isPending}
+            className="absolute bottom-2 right-2 rounded-md bg-black/60 hover:bg-black/80 text-white px-2 py-1 text-xs font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+          >
+            {coverMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <ImagePlus size={12} />}
+            {item.cover_path ? 'Replace' : 'Upload'}
+          </button>
         </div>
 
         {/* Right: Metadata */}

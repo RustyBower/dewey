@@ -86,6 +86,15 @@ export async function returnItem(itemId: string, lendingId: string): Promise<Len
   return data;
 }
 
+export async function uploadCover(itemId: string, file: File): Promise<Item> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const { data } = await client.post<Item>(`/items/${itemId}/cover`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}
+
 export async function refreshItemMetadata(itemId: string) {
   const { data } = await client.post(`/refresh/item/${itemId}`);
   return data;
