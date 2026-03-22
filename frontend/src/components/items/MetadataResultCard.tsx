@@ -52,7 +52,7 @@ export default function MetadataResultCard({
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
 
-  const Icon = mediaTypeIcons[result.media_type] ?? BookOpen;
+  const Icon = mediaTypeIcons[result.media_type as keyof typeof mediaTypeIcons] ?? BookOpen;
   const badgeColor =
     sourceBadgeColors[result.source] ??
     'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';

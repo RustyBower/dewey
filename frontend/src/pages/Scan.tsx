@@ -14,7 +14,7 @@ import {
   SkipForward,
 } from 'lucide-react';
 import BarcodeScanner from '../components/scanner/BarcodeScanner';
-import { lookupBarcode, type BarcodeLookupResponse } from '../api/lookup';
+import { lookupBarcode } from '../api/lookup';
 import { createItem } from '../api/items';
 import type { Item, MetadataResult } from '../types';
 
