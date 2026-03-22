@@ -416,7 +416,7 @@ export default function Library() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2">
+        <div className="flex justify-center items-center gap-1">
           <button
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
@@ -424,9 +424,35 @@ export default function Library() {
           >
             Previous
           </button>
-          <span className="flex items-center px-3 text-sm text-gray-500">
-            Page {page} of {totalPages}
-          </span>
+          {(() => {
+            const pages: (number | '...')[] = [];
+            if (totalPages <= 7) {
+              for (let i = 1; i <= totalPages; i++) pages.push(i);
+            } else {
+              pages.push(1);
+              if (page > 3) pages.push('...');
+              for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i);
+              if (page < totalPages - 2) pages.push('...');
+              pages.push(totalPages);
+            }
+            return pages.map((p, i) =>
+              p === '...' ? (
+                <span key={`ellipsis-${i}`} className="px-2 text-sm text-gray-400">...</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    p === page
+                      ? 'bg-rose-600 text-white'
+                      : 'border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            );
+          })()}
           <button
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
