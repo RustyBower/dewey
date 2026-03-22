@@ -56,6 +56,11 @@ if os.path.isdir(settings.COVERS_DIR):
     app.mount("/covers", StaticFiles(directory=settings.COVERS_DIR), name="covers")
 
 # Mount frontend static files if they exist (production)
-frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
-if frontend_dir.is_dir():
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+# Check multiple possible locations
+for candidate in [
+    Path(__file__).resolve().parent.parent / "static",        # /app/static/ (Docker production)
+    Path(__file__).resolve().parent.parent.parent / "frontend" / "dist",  # local dev
+]:
+    if candidate.is_dir():
+        app.mount("/", StaticFiles(directory=str(candidate), html=True), name="frontend")
+        break
