@@ -1,20 +1,49 @@
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.database import get_db
+from app.models.item import Item
 from app.models.user import User
+from app.schemas.item import ItemResponse
 from app.schemas.metadata import MetadataResult
 from app.services.metadata.resolver import resolver
 
 router = APIRouter(prefix="/lookup", tags=["lookup"])
 
 
-@router.get("/barcode/{code}", response_model=list[MetadataResult])
+class BarcodeLookupResponse(BaseModel):
+    existing: ItemResponse | None = None
+    results: list[MetadataResult] = []
+
+
+@router.get("/barcode/{code}", response_model=BarcodeLookupResponse)
 async def lookup_barcode(
     code: str,
+    db: AsyncSession = Depends(get_db),
     _current_user: User = Depends(get_current_user),
-) -> list[MetadataResult]:
+) -> BarcodeLookupResponse:
+    # Check for existing item with this barcode
+    from sqlalchemy.orm import selectinload
+
+    existing_result = await db.execute(
+        select(Item)
+        .where(Item.barcode == code)
+        .options(
+            selectinload(Item.book_metadata),
+            selectinload(Item.movie_metadata),
+            selectinload(Item.music_metadata),
+            selectinload(Item.game_metadata),
+        )
+        .limit(1)
+    )
+    existing = existing_result.scalar_one_or_none()
+
+    # Lookup from external sources
     results = await resolver.lookup_barcode(code)
-    return [
+    metadata_results = [
         MetadataResult(
             title=r.title,
             creators=r.creators,
@@ -31,6 +60,11 @@ async def lookup_barcode(
         )
         for r in results
     ]
+
+    return BarcodeLookupResponse(
+        existing=existing,
+        results=metadata_results,
+    )
 
 
 @router.get("/search", response_model=list[MetadataResult])

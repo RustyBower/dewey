@@ -1,10 +1,13 @@
 import client from './client';
-import type { MetadataResult, MediaType } from '../types';
+import type { Item, MetadataResult, MediaType } from '../types';
 
-export async function lookupBarcode(code: string): Promise<MetadataResult[]> {
-  const { data } = await client.get<MetadataResult[]>('/lookup/barcode', {
-    params: { barcode: code },
-  });
+export interface BarcodeLookupResponse {
+  existing: Item | null;
+  results: MetadataResult[];
+}
+
+export async function lookupBarcode(code: string): Promise<BarcodeLookupResponse> {
+  const { data } = await client.get<BarcodeLookupResponse>(`/lookup/barcode/${code}`);
   return data;
 }
 
@@ -13,7 +16,7 @@ export async function searchMetadata(
   mediaType?: MediaType
 ): Promise<MetadataResult[]> {
   const { data } = await client.get<MetadataResult[]>('/lookup/search', {
-    params: { query, media_type: mediaType },
+    params: { q: query, media_type: mediaType },
   });
   return data;
 }
