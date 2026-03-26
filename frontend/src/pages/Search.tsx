@@ -5,7 +5,7 @@ import { useDebounce } from '../hooks/useDebounce';
 import { searchMetadata } from '../api/lookup';
 import { createItem } from '../api/items';
 import MetadataResultCard from '../components/items/MetadataResultCard';
-import type { MediaType, MetadataResult, ItemStatus, Item } from '../types';
+import type { MediaType, MetadataResult, ItemStatus, Item, BookMetadata } from '../types';
 
 const mediaTypes: { label: string; value: MediaType | '' }[] = [
   { label: 'All Types', value: '' },
@@ -43,13 +43,17 @@ export default function Search() {
       status: ItemStatus;
       location: string;
     }) => {
-      const bookMetadata = result.media_type === 'book' && result.extra ? {
+      const bookMetadata: BookMetadata | undefined = result.media_type === 'book' && result.extra ? {
         isbn_13: result.extra.isbn_13 as string | null ?? null,
         isbn_10: result.extra.isbn_10 as string | null ?? null,
         page_count: result.extra.page_count as number | null ?? null,
         language: result.extra.language as string | null ?? null,
         series_name: result.extra.series_name as string | null ?? null,
         series_position: result.extra.series_position as string | null ?? null,
+        edition: null,
+        format: null,
+        dewey_decimal: null,
+        lcc: null,
       } : undefined;
       return createItem({
         title: result.title,

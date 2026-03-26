@@ -16,7 +16,7 @@ import {
 import BarcodeScanner from '../components/scanner/BarcodeScanner';
 import { lookupBarcode } from '../api/lookup';
 import { createItem } from '../api/items';
-import type { Item, MetadataResult } from '../types';
+import type { Item, MetadataResult, BookMetadata } from '../types';
 
 const mediaIcons = { book: BookOpen, movie: Film, music: Disc3, game: Gamepad2 };
 
@@ -68,13 +68,17 @@ export default function Scan() {
   // Add item mutation
   const addMutation = useMutation({
     mutationFn: async (result: MetadataResult) => {
-      const bookMetadata = result.media_type === 'book' && result.extra ? {
+      const bookMetadata: BookMetadata | undefined = result.media_type === 'book' && result.extra ? {
         isbn_13: result.extra.isbn_13 as string | null ?? null,
         isbn_10: result.extra.isbn_10 as string | null ?? null,
         page_count: result.extra.page_count as number | null ?? null,
         language: result.extra.language as string | null ?? null,
         series_name: result.extra.series_name as string | null ?? null,
         series_position: result.extra.series_position as string | null ?? null,
+        edition: null,
+        format: null,
+        dewey_decimal: null,
+        lcc: null,
       } : undefined;
       return createItem({
         title: result.title,
