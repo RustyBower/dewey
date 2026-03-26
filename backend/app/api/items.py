@@ -127,7 +127,12 @@ async def create_item(
             item.cover_path = cover_path
 
     await db.flush()
-    await db.refresh(item, attribute_names=list(METADATA_ATTR_MAP.values()))
+
+    # Re-fetch with eager loading to avoid greenlet errors during serialization
+    result = await db.execute(
+        select(Item).where(Item.id == item.id).options(*ITEM_LOAD_OPTIONS)
+    )
+    item = result.scalar_one()
     return item
 
 
