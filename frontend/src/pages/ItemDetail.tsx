@@ -628,6 +628,11 @@ export default function ItemDetail() {
       notes: item.notes,
       barcode: item.barcode,
       cover_path: item.cover_path,
+      book_metadata: item.media_type === 'book' ? {
+        ...item.book_metadata,
+        series_name: item.book_metadata?.series_name ?? null,
+        series_position: item.book_metadata?.series_position ?? null,
+      } as BookMetadata : undefined,
     });
     setEditing(true);
   }
@@ -843,6 +848,48 @@ export default function ItemDetail() {
           ) : (
             item.rating != null &&
             item.rating > 0 && <StarRating rating={item.rating} />
+          )}
+
+          {/* Series (books only, edit mode) */}
+          {editing && item.media_type === 'book' && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">Series Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Oregon Files"
+                  value={editData.book_metadata?.series_name ?? ''}
+                  onChange={(e) =>
+                    setEditData({
+                      ...editData,
+                      book_metadata: {
+                        ...editData.book_metadata,
+                        series_name: e.target.value || null,
+                      } as BookMetadata,
+                    })
+                  }
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Series #</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 19"
+                  value={editData.book_metadata?.series_position ?? ''}
+                  onChange={(e) =>
+                    setEditData({
+                      ...editData,
+                      book_metadata: {
+                        ...editData.book_metadata,
+                        series_position: e.target.value || null,
+                      } as BookMetadata,
+                    })
+                  }
+                  className="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+            </div>
           )}
 
           {/* Action buttons */}

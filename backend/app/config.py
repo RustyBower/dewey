@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     GOOGLE_BOOKS_API_KEY: str | None = None
     IGDB_CLIENT_ID: str | None = None
     IGDB_CLIENT_SECRET: str | None = None
+    HARDCOVER_API_TOKEN: str | None = None
 
     COVERS_DIR: str = "/data/covers"
 

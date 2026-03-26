@@ -68,6 +68,14 @@ export default function Scan() {
   // Add item mutation
   const addMutation = useMutation({
     mutationFn: async (result: MetadataResult) => {
+      const bookMetadata = result.media_type === 'book' && result.extra ? {
+        isbn_13: result.extra.isbn_13 as string | null ?? null,
+        isbn_10: result.extra.isbn_10 as string | null ?? null,
+        page_count: result.extra.page_count as number | null ?? null,
+        language: result.extra.language as string | null ?? null,
+        series_name: result.extra.series_name as string | null ?? null,
+        series_position: result.extra.series_position as string | null ?? null,
+      } : undefined;
       return createItem({
         title: result.title,
         media_type: result.media_type as Item['media_type'],
@@ -79,6 +87,7 @@ export default function Scan() {
         publisher: result.publisher,
         status: 'owned',
         cover_url: result.cover_url ?? undefined,
+        book_metadata: bookMetadata,
       });
     },
     onSuccess: (item, result) => {
@@ -131,7 +140,22 @@ export default function Scan() {
   // Determine what to show
   const existing = lookupData?.existing ?? null;
   const results = lookupData?.results ?? [];
-  const topResult = results[0] ?? null;
+  // If we have an existing item but no metadata results, construct one from the existing item
+  // so the user can still add another copy
+  const topResult = results[0] ?? (existing ? {
+    title: existing.title,
+    creators: existing.creators,
+    year: existing.year,
+    description: existing.description,
+    cover_url: existing.cover_path ? `/covers/${existing.cover_path}` : null,
+    genre: existing.genre,
+    publisher: existing.publisher,
+    barcode: existing.barcode,
+    source: 'existing',
+    source_id: existing.id,
+    media_type: existing.media_type,
+    extra: {},
+  } as MetadataResult : null);
   const showResults = !!lookupCode && !isLoading && lookupData;
 
   // Global keydown for quick actions when results are shown

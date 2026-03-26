@@ -8,6 +8,11 @@ from .base import MetadataProvider, MetadataResult
 logger = logging.getLogger(__name__)
 
 
+PLACEHOLDER_PATTERNS = re.compile(
+    r"\buntitled\b", re.IGNORECASE
+)
+
+
 class OpenLibraryProvider(MetadataProvider):
     BASE_URL = "https://openlibrary.org"
     COVERS_URL = "https://covers.openlibrary.org"
@@ -21,6 +26,12 @@ class OpenLibraryProvider(MetadataProvider):
 
                 book = resp.json()
                 title = book.get("title", "")
+
+                # Skip placeholder/stub records
+                if PLACEHOLDER_PATTERNS.search(title):
+                    logger.info(f"Skipping OpenLibrary placeholder: {title!r}")
+                    return []
+
                 source_id = book.get("key", "")
 
                 # Parse authors

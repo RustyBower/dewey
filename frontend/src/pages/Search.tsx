@@ -43,6 +43,14 @@ export default function Search() {
       status: ItemStatus;
       location: string;
     }) => {
+      const bookMetadata = result.media_type === 'book' && result.extra ? {
+        isbn_13: result.extra.isbn_13 as string | null ?? null,
+        isbn_10: result.extra.isbn_10 as string | null ?? null,
+        page_count: result.extra.page_count as number | null ?? null,
+        language: result.extra.language as string | null ?? null,
+        series_name: result.extra.series_name as string | null ?? null,
+        series_position: result.extra.series_position as string | null ?? null,
+      } : undefined;
       return createItem({
         title: result.title,
         media_type: result.media_type as Item['media_type'],
@@ -55,6 +63,7 @@ export default function Search() {
         status,
         notes: location ? `Location: ${location}` : null,
         cover_url: result.cover_url ?? undefined,
+        book_metadata: bookMetadata,
       });
     },
     onSuccess: () => {
