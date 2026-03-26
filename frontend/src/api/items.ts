@@ -86,6 +86,21 @@ export async function returnItem(itemId: string, lendingId: string): Promise<Len
   return data;
 }
 
+export async function getItemTags(itemId: string): Promise<string[]> {
+  const { data } = await client.get<string[]>(`/items/${itemId}/tags`);
+  return data;
+}
+
+export async function setItemTags(itemId: string, tags: string[]): Promise<string[]> {
+  const { data } = await client.put<string[]>(`/items/${itemId}/tags`, tags);
+  return data;
+}
+
+export async function getTags(): Promise<{ id: string; name: string; color: string | null }[]> {
+  const { data } = await client.get('/tags/');
+  return data;
+}
+
 export async function uploadCover(itemId: string, file: File): Promise<Item> {
   const formData = new FormData();
   formData.append('file', file);

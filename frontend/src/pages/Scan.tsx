@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
@@ -15,8 +15,9 @@ import {
 } from 'lucide-react';
 import BarcodeScanner from '../components/scanner/BarcodeScanner';
 import { lookupBarcode } from '../api/lookup';
-import { createItem } from '../api/items';
+import { createItem, setItemTags, getTags } from '../api/items';
 import type { Item, MetadataResult, BookMetadata } from '../types';
+import { Tag } from 'lucide-react';
 
 const mediaIcons = { book: BookOpen, movie: Film, music: Disc3, game: Gamepad2 };
 
@@ -32,9 +33,18 @@ export default function Scan() {
   const [lookupCode, setLookupCode] = useState('');
   const [cameraActive, setCameraActive] = useState(false);
   const [scanLog, setScanLog] = useState<ScanLogEntry[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTag, setCustomTag] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
+
+  // Fetch existing tags for quick-pick
+  const { data: allTags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: getTags,
+  });
+  const tagNames = useMemo(() => allTags.map((t) => t.name), [allTags]);
 
   // Keep input focused when no lookup is active
   useEffect(() => {
@@ -44,6 +54,8 @@ export default function Scan() {
   const resetForNextScan = useCallback(() => {
     setBarcode('');
     setLookupCode('');
+    setSelectedTags([]);
+    setCustomTag('');
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
 
@@ -94,13 +106,18 @@ export default function Scan() {
         book_metadata: bookMetadata,
       });
     },
-    onSuccess: (item, result) => {
+    onSuccess: async (item, result) => {
+      // Apply tags if any selected
+      if (selectedTags.length > 0) {
+        await setItemTags(item.id, selectedTags);
+      }
       setScanLog((prev) => [
         { title: result.title, media_type: result.media_type, action: 'added', id: item.id },
         ...prev,
       ]);
       queryClient.invalidateQueries({ queryKey: ['items'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
       resetForNextScan();
     },
   });
@@ -320,6 +337,53 @@ export default function Scan() {
                   {topResult.media_type}
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Quick tags */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-300">
+              <Tag size={12} />
+              Tags
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {tagNames.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() =>
+                    setSelectedTags((prev) =>
+                      prev.includes(name) ? prev.filter((t) => t !== name) : [...prev, name]
+                    )
+                  }
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    selectedTags.includes(name)
+                      ? 'bg-green-600 text-white'
+                      : 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800'
+                  }`}
+                >
+                  {name}
+                </button>
+              ))}
+              <form
+                className="inline-flex"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const name = customTag.trim();
+                  if (name && !selectedTags.includes(name)) {
+                    setSelectedTags((prev) => [...prev, name]);
+                    setCustomTag('');
+                  }
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="+ new tag"
+                  value={customTag}
+                  onChange={(e) => setCustomTag(e.target.value)}
+                  className="rounded-full border border-green-300 dark:border-green-700 bg-transparent px-2.5 py-0.5 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-green-500 placeholder:text-green-400 dark:placeholder:text-green-600"
+                />
+              </form>
             </div>
           </div>
 

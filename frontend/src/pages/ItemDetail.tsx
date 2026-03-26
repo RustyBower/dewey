@@ -30,6 +30,9 @@ import {
   getLendingHistory,
   lendItem,
   returnItem,
+  getItemTags,
+  setItemTags,
+  getTags,
 } from '../api/items';
 import type {
   Item,
@@ -561,6 +564,8 @@ export default function ItemDetail() {
   const [editData, setEditData] = useState<Partial<Item>>({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
 
   const {
     data: item,
@@ -570,6 +575,25 @@ export default function ItemDetail() {
     queryKey: ['item', id],
     queryFn: () => getItem(id!),
     enabled: !!id,
+  });
+
+  const { data: itemTags = [] } = useQuery({
+    queryKey: ['item-tags', id],
+    queryFn: () => getItemTags(id!),
+    enabled: !!id,
+  });
+
+  const { data: allTags = [] } = useQuery({
+    queryKey: ['tags'],
+    queryFn: getTags,
+  });
+
+  const tagsMutation = useMutation({
+    mutationFn: (tags: string[]) => setItemTags(id!, tags),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['item-tags', id] });
+      queryClient.invalidateQueries({ queryKey: ['tags'] });
+    },
   });
 
   const updateMutation = useMutation({
@@ -634,16 +658,24 @@ export default function ItemDetail() {
         series_position: item.book_metadata?.series_position ?? null,
       } as BookMetadata : undefined,
     });
+    setEditTags([...itemTags]);
     setEditing(true);
   }
 
   function cancelEdit() {
     setEditing(false);
     setEditData({});
+    setEditTags([]);
+    setNewTagInput('');
   }
 
   function saveEdit() {
     updateMutation.mutate(editData);
+    // Save tags if they changed
+    const tagsChanged = editTags.length !== itemTags.length || editTags.some((t, i) => t !== itemTags[i]);
+    if (tagsChanged) {
+      tagsMutation.mutate(editTags);
+    }
   }
 
   const Icon = item ? mediaTypeIcons[item.media_type] ?? BookOpen : BookOpen;
@@ -891,6 +923,75 @@ export default function ItemDetail() {
               </div>
             </div>
           )}
+
+          {/* Tags */}
+          {editing ? (
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium">Tags</label>
+              <div className="flex flex-wrap gap-1.5">
+                {allTags.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() =>
+                      setEditTags((prev) =>
+                        prev.includes(t.name)
+                          ? prev.filter((n) => n !== t.name)
+                          : [...prev, t.name]
+                      )
+                    }
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                      editTags.includes(t.name)
+                        ? 'bg-rose-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+                {editTags.filter((t) => !allTags.some((at) => at.name === t)).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setEditTags((prev) => prev.filter((n) => n !== t))}
+                    className="rounded-full px-2.5 py-0.5 text-xs font-medium bg-rose-600 text-white"
+                  >
+                    {t}
+                  </button>
+                ))}
+                <form
+                  className="inline-flex"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const name = newTagInput.trim();
+                    if (name && !editTags.includes(name)) {
+                      setEditTags((prev) => [...prev, name]);
+                      setNewTagInput('');
+                    }
+                  }}
+                >
+                  <input
+                    type="text"
+                    placeholder="+ new tag"
+                    value={newTagInput}
+                    onChange={(e) => setNewTagInput(e.target.value)}
+                    className="rounded-full border border-gray-300 dark:border-gray-700 bg-transparent px-2.5 py-0.5 text-xs w-24 focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder:text-gray-400"
+                  />
+                </form>
+              </div>
+            </div>
+          ) : itemTags.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {itemTags.map((name) => (
+                <span
+                  key={name}
+                  className="rounded-full bg-gray-100 dark:bg-gray-800 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          ) : null}
 
           {/* Action buttons */}
           <div className="flex gap-2">

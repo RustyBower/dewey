@@ -202,6 +202,59 @@ async def delete_item(
     await db.delete(item)
 
 
+@router.put("/{item_id}/tags", response_model=list[str])
+async def set_item_tags(
+    item_id: uuid.UUID,
+    tag_names: list[str],
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+) -> list[str]:
+    """Replace all tags on an item. Creates new tags as needed."""
+    from app.models.tag import Tag, item_tags
+
+    result = await db.execute(select(Item).where(Item.id == item_id))
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+
+    # Remove existing tags
+    await db.execute(item_tags.delete().where(item_tags.c.item_id == item_id))
+
+    # Add new tags
+    for name in tag_names:
+        name = name.strip()
+        if not name:
+            continue
+        tag_result = await db.execute(select(Tag).where(Tag.name == name))
+        tag = tag_result.scalar_one_or_none()
+        if not tag:
+            tag = Tag(name=name)
+            db.add(tag)
+            await db.flush()
+        await db.execute(
+            item_tags.insert().values(item_id=item_id, tag_id=tag.id)
+        )
+
+    return [n.strip() for n in tag_names if n.strip()]
+
+
+@router.get("/{item_id}/tags", response_model=list[str])
+async def get_item_tags(
+    item_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+) -> list[str]:
+    from app.models.tag import Tag, item_tags
+
+    result = await db.execute(
+        select(Tag.name)
+        .join(item_tags, item_tags.c.tag_id == Tag.id)
+        .where(item_tags.c.item_id == item_id)
+        .order_by(Tag.name)
+    )
+    return list(result.scalars().all())
+
+
 @router.post("/{item_id}/cover", response_model=ItemResponse)
 async def upload_cover(
     item_id: uuid.UUID,
