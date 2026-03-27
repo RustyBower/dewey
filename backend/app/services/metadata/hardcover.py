@@ -16,6 +16,15 @@ query SearchBooks($query: String!) {
 }
 """
 
+SERIES_AUTHOR_QUERY = """
+query SeriesAuthor($series_id: Int!) {
+  series(where: {id: {_eq: $series_id}}) {
+    name
+    author { name }
+  }
+}
+"""
+
 ISBN_LOOKUP_QUERY = """
 query LookupISBN($isbn: String!) {
   editions(where: {isbn_13: {_eq: $isbn}}) {
@@ -32,7 +41,7 @@ query LookupISBN($isbn: String!) {
       book_series {
         position
         details
-        series { name }
+        series { name author { name } }
       }
       cached_image
       cached_tags
@@ -69,7 +78,7 @@ class HardcoverEnricher:
             if doc is None:
                 return result
 
-            return self._merge(result, doc)
+            return await self._merge(result, doc)
         except Exception as e:
             logger.warning(f"Hardcover enrichment failed: {e}")
             return result
@@ -111,8 +120,9 @@ class HardcoverEnricher:
         book_series = book.get("book_series", [])
         if book_series:
             bs = book_series[0]
+            series_obj = bs.get("series", {})
             series_info = {
-                "series": bs.get("series", {}),
+                "series": series_obj,
                 "position": bs.get("position"),
             }
 
@@ -190,19 +200,31 @@ class HardcoverEnricher:
 
         return True
 
-    @staticmethod
-    def _merge(result: MetadataResult, doc: dict) -> MetadataResult:
+    async def _merge(self, result: MetadataResult, doc: dict) -> MetadataResult:
         """Merge Hardcover data into the existing result.  Hardcover wins for
         fields it has better data for; the original result's barcode/ISBN is
         never overwritten."""
 
         # Series info
         series = doc.get("featured_series", {})
+        series_author_name = None
         if series and series.get("series"):
             result.extra["series_name"] = series["series"]["name"]
             position = series.get("position")
             if position is not None:
                 result.extra["series_position"] = str(int(position)) if position == int(position) else str(position)
+
+            # Get series author — try from the doc first (ISBN path includes it),
+            # otherwise do a follow-up query (search path doesn't include it)
+            series_author = series.get("series", {}).get("author", {})
+            if series_author and series_author.get("name"):
+                series_author_name = series_author["name"]
+            elif series.get("series", {}).get("id"):
+                series_author_name = await self._get_series_author(series["series"]["id"])
+
+        # sort_author: series author if available, else first creator
+        sort_source = series_author_name or result.creators or ""
+        result.extra["sort_author"] = self._to_sort_name(sort_source)
 
         # Better description — prefer Hardcover's longer description
         hc_desc = doc.get("description")
@@ -221,3 +243,32 @@ class HardcoverEnricher:
             result.cover_url = hc_cover
 
         return result
+
+    async def _get_series_author(self, series_id: int) -> str | None:
+        """Fetch the primary author for a series."""
+        data = await self._graphql(SERIES_AUTHOR_QUERY, {"series_id": series_id})
+        if data is None:
+            return None
+        series_list = data.get("data", {}).get("series", [])
+        for s in series_list:
+            author = s.get("author")
+            if author and author.get("name"):
+                # Skip malformed entries like "Clive;Dirgo Craig Cussler"
+                name = author["name"]
+                if ";" not in name:
+                    return name
+        return None
+
+    @staticmethod
+    def _to_sort_name(name: str) -> str:
+        """Convert 'First Last' to 'Last, First' for shelf sorting.
+        Handles 'First Last, Second Author' by using only the first author."""
+        if not name:
+            return ""
+        # Take only the first author if comma-separated list
+        first_author = name.split(",")[0].strip()
+        parts = first_author.split()
+        if len(parts) < 2:
+            return first_author
+        # Last word is the last name
+        return f"{parts[-1]}, {' '.join(parts[:-1])}"

@@ -77,6 +77,7 @@ class BookMetadata(Base):
     format: Mapped[str | None] = mapped_column(String(50), nullable=True)
     dewey_decimal: Mapped[str | None] = mapped_column(String(20), nullable=True)
     lcc: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    sort_author: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     item: Mapped["Item"] = relationship(back_populates="book_metadata")
 

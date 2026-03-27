@@ -28,6 +28,7 @@ export interface BookMetadata {
   format: string | null;
   dewey_decimal: string | null;
   lcc: string | null;
+  sort_author: string | null;
 }
 
 export interface MovieMetadata {

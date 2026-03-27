@@ -54,6 +54,7 @@ export default function Search() {
         format: null,
         dewey_decimal: null,
         lcc: null,
+        sort_author: result.extra.sort_author as string | null ?? null,
       } : undefined;
       return createItem({
         title: result.title,

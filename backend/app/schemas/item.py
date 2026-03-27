@@ -15,6 +15,7 @@ class BookMetadataSchema(BaseModel):
     format: str | None = None
     dewey_decimal: str | None = None
     lcc: str | None = None
+    sort_author: str | None = None
 
     model_config = {"from_attributes": True}
 
